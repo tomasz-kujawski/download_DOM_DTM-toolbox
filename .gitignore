@@ -1,0 +1,31 @@
+# Raster files
+*.tif
+*.ovr
+*.aux.xml
+*.tfw
+
+# ArcGIS locks
+*.lock
+
+# Python
+__pycache__/
+*.pyc
+
+# Download folders
+*_DOM_tiles_download/
+*_DTM_tiles_download/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# ArcGIS temp
+GpMessages/
+ImportLog/
+Index/
+RasterFunctionTemplates/
+
+.ignore
+*.gdb/
+
+.backups/
+*.ipynb
