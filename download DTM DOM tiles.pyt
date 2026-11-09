@@ -78,6 +78,12 @@ class PrepareDOM_and_DTM(object):
 
     def execute(self, parameters, messages):
 
+        project_gdb = arcpy.mp.ArcGISProject(
+            "CURRENT"
+        ).defaultGeodatabase
+
+        arcpy.env.workspace = project_gdb
+
 
         input_feature = parameters[0].valueAsText
         dom_buffer = parameters[1].value
