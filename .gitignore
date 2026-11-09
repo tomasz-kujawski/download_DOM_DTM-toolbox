@@ -1,0 +1,36 @@
+# ArcGIS geodatabases
+*.gdb/
+*.lock
+
+# Raster files
+*.tif
+*.tfw
+*.ovr
+*.aux.xml
+
+# Downloaded tiles
+*_DOM_tiles_download/
+*_DTM_tiles_download/
+
+# Jupyter
+*.ipynb
+.ipynb_checkpoints/
+
+# ArcGIS generated folders
+GpMessages/
+ImportLog/
+Index/
+RasterFunctionTemplates/
+.backups/
+
+# Python
+__pycache__/
+*.pyc
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Mosaic outputs
+*_DOM/
+*_DTM/
