@@ -1,6 +1,7 @@
 import arcpy
 import os
 from urllib.request import urlretrieve
+from arcpy.sa import ExtractByMask
 
 dom_grid = "DOM_GRID"
 
@@ -56,7 +57,7 @@ class PrepareDOM_and_DTM(object):
             parameterType="Required",
             direction="Input"
         )
-
+        resolution.value = "1"
         resolution.filter.type = "ValueList"
         resolution.filter.list = ["1", "10", "50"]
 
@@ -184,6 +185,37 @@ class PrepareDOM_and_DTM(object):
                 )
         ))
 
+        if dtm_buffer:
+
+            dtm_tile_selection_fc = os.path.join(
+                project_gdb,
+                f"{feature_name}_DTM_tiles"
+            )
+
+            if arcpy.Exists(dtm_tile_selection_fc):
+                arcpy.management.Delete(
+                    dtm_tile_selection_fc
+                )
+
+            arcpy.analysis.Intersect(
+                in_features=[dom_grid, dtm_buffer_name],
+                out_feature_class=dtm_tile_selection_fc,
+                join_attributes="ALL",
+                output_type="INPUT"
+            )
+
+            dtm_tiles = sorted(set(
+                row[0]
+                for row in arcpy.da.SearchCursor(
+                    dtm_tile_selection_fc,
+                    ["TileName"]
+                )
+            ))
+
+            arcpy.AddMessage(
+                f"Found {len(dtm_tiles)} DTM tiles."
+            )
+
         if len(tiles) == 0:
             raise Exception(
             "No DOM tiles intersect the analysis area."
@@ -250,7 +282,7 @@ class PrepareDOM_and_DTM(object):
                 exist_ok=True
             )
 
-            for tile in tiles:
+            for tile in dtm_tiles:
 
                 url = (
                     f"https://nedlasting.geonorge.no/hoydedata/DTM{resolution}/{tile}.tif"
@@ -298,71 +330,134 @@ class PrepareDOM_and_DTM(object):
             "Download workflow completed."
         )
 
-        dom_rasters = []
+        arcpy.CheckOutExtension("Spatial")
 
+        clipped_folder = os.path.join(
+            project_folder,
+            f"{feature_name}_DOM_tiles_clipped"
+        )
+
+        os.makedirs(
+            clipped_folder,
+            exist_ok=True
+        )
         for file in os.listdir(download_folder):
-            if file.lower().endswith(".tif"):
-                dom_rasters.append(os.path.join(download_folder, file))
+            if not file.lower().endswith(".tif"):
+                continue
+            input_raster= os.path.join(
+                download_folder,
+                file
+            )
+            output_raster = os.path.join(
+                clipped_folder,
+                file.replace(".tif", "_clipped.tif")
+            )
+            if arcpy.Exists(output_raster):
+                arcpy.management.Delete(output_raster)
 
-        if len(dom_rasters) == 0:
-            raise Exception(
-                "No DOM rasters found in the download folder."
+            arcpy.AddMessage(
+                f"clipping DOM tile: {file}"
             )
 
-        dom_raw = f"{feature_name}_DOM_raw.tif"
-
-        dom_raw_path = os.path.join(
-            download_folder,
-            dom_raw
-        )
-
-        if arcpy.Exists(dom_raw_path):
-            arcpy.management.Delete(dom_raw_path)
-
-        arcpy.management.MosaicToNewRaster(
-            input_rasters=dom_rasters,
-            output_location=download_folder,
-            raster_dataset_name_with_extension=dom_raw,
-            coordinate_system_for_the_raster=arcpy.SpatialReference(25833),
-            pixel_type="32_BIT_FLOAT",
-            cellsize=1,
-            number_of_bands=1,
-            mosaic_method="LAST",
-            mosaic_colormap_mode="FIRST"
-        )
-
-        dtm_rasters = []
-
-        for file in os.listdir(dtm_download_folder):
-            if file.lower().endswith(".tif"):
-                dtm_rasters.append(os.path.join(dtm_download_folder, file))
-
-        if len(dtm_rasters) == 0:
-            raise Exception(
-                "No DTM rasters found in the download folder."
+            arcpy.AddMessage(
+                f"Processing raster: {input_raster}"
             )
 
-        dtm_raw = f"{feature_name}_DTM_raw.tif"
+            clipped = ExtractByMask(
+                input_raster,
+                dom_buffer_name
+            )
 
-        dtm_raw_path = os.path.join(
-            dtm_download_folder,
-            dtm_raw
-        )
+            clipped.save(output_raster)
 
-        if arcpy.Exists(dtm_raw_path):
-            arcpy.management.Delete(dtm_raw_path)
+            os.remove(input_raster)
 
-        arcpy.management.MosaicToNewRaster(
-            input_rasters=dtm_rasters,
-            output_location=dtm_download_folder,
-            raster_dataset_name_with_extension=dtm_raw,
-            coordinate_system_for_the_raster=arcpy.SpatialReference(25833),
-            pixel_type="32_BIT_FLOAT",
-            cellsize=1,
-            number_of_bands=1,
-            mosaic_method="LAST",
-            mosaic_colormap_mode="FIRST"
-        )
+        if dtm_buffer:
+
+            clipped_folder_DTM = os.path.join(
+                project_folder,
+                f"{feature_name}_DTM_tiles_clipped"
+            )
+
+            os.makedirs(
+                clipped_folder_DTM,
+                exist_ok=True
+            )
+
+            for file in os.listdir(dtm_download_folder):
+
+                if not file.lower().endswith(".tif"):
+                    continue
+
+            input_raster = os.path.join(
+                dtm_download_folder,
+                file
+            )
+
+            output_raster = os.path.join(
+                clipped_folder_DTM,
+                file.replace(".tif", "_clipped.tif")
+            )
+
+            if arcpy.Exists(output_raster):
+                arcpy.management.Delete(output_raster)
+
+            arcpy.AddMessage(
+                f"Clipping DTM tile: {file}"
+            )
+
+            arcpy.AddMessage(
+                f"Processing raster: {input_raster}"
+            )
+
+            arcpy.AddMessage("=" * 50)
+            arcpy.AddMessage(f"Processing: {input_raster}")
+
+            r_desc = arcpy.Describe(input_raster)
+            b_desc = arcpy.Describe(dtm_buffer_name)
+
+            arcpy.AddMessage(
+                f"Raster SR: {r_desc.spatialReference.name}"
+            )
+
+            arcpy.AddMessage(
+                f"Buffer SR: {b_desc.spatialReference.name}"
+            )
+
+            arcpy.AddMessage(
+                f"Raster extent: "
+                f"{r_desc.extent.XMin}, "
+                f"{r_desc.extent.YMin}, "
+                f"{r_desc.extent.XMax}, "
+                f"{r_desc.extent.YMax}"
+            )
+
+            arcpy.AddMessage(
+                f"Buffer extent: "
+                f"{b_desc.extent.XMin}, "
+                f"{b_desc.extent.YMin}, "
+                f"{b_desc.extent.XMax}, "
+                f"{b_desc.extent.YMax}"
+            )
+
+            arcpy.AddMessage(
+                f"Raster SR: {r_desc.spatialReference.name}"
+            )
+
+            arcpy.AddMessage(
+                f"Buffer SR: {b_desc.spatialReference.name}"
+            )
+
+            clipped = ExtractByMask(
+                input_raster,
+                dtm_buffer_name
+            )
+
+            clipped.save(output_raster)
+
+            os.remove(input_raster)    
+
+
 
         return
 
