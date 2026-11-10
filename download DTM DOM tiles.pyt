@@ -2,6 +2,7 @@ import arcpy
 import os
 from urllib.request import urlretrieve
 from arcpy.sa import ExtractByMask
+import shutil
 
 dom_grid = "DOM_GRID"
 
@@ -370,7 +371,12 @@ class PrepareDOM_and_DTM(object):
 
             clipped.save(output_raster)
 
-            os.remove(input_raster)
+        if os.path.exists(download_folder):
+            shutil.rmtree(download_folder)
+
+        arcpy.AddMessage(
+            f"Removed download folder: {download_folder}"
+        )
 
         if dtm_buffer:
 
@@ -389,74 +395,37 @@ class PrepareDOM_and_DTM(object):
                 if not file.lower().endswith(".tif"):
                     continue
 
-            input_raster = os.path.join(
-                dtm_download_folder,
-                file
-            )
+                input_raster = os.path.join(
+                    dtm_download_folder,
+                    file
+                )
 
-            output_raster = os.path.join(
-                clipped_folder_DTM,
-                file.replace(".tif", "_clipped.tif")
-            )
+                output_raster = os.path.join(
+                    clipped_folder_DTM,
+                    file.replace(".tif", "_clipped.tif")
+                )
 
-            if arcpy.Exists(output_raster):
-                arcpy.management.Delete(output_raster)
+                if arcpy.Exists(output_raster):
+                    arcpy.management.Delete(output_raster)
 
-            arcpy.AddMessage(
-                f"Clipping DTM tile: {file}"
-            )
+                arcpy.AddMessage(
+                    f"Clipping DTM tile: {file}"
+                )
 
-            arcpy.AddMessage(
-                f"Processing raster: {input_raster}"
-            )
+                clipped = ExtractByMask(
+                    input_raster,
+                    dtm_buffer_name
+                    )
 
-            arcpy.AddMessage("=" * 50)
-            arcpy.AddMessage(f"Processing: {input_raster}")
+                clipped.save(output_raster)
 
-            r_desc = arcpy.Describe(input_raster)
-            b_desc = arcpy.Describe(dtm_buffer_name)
+            if dtm_buffer:
+                if os.path.exists(dtm_download_folder):
+                    shutil.rmtree(dtm_download_folder)
 
-            arcpy.AddMessage(
-                f"Raster SR: {r_desc.spatialReference.name}"
-            )
-
-            arcpy.AddMessage(
-                f"Buffer SR: {b_desc.spatialReference.name}"
-            )
-
-            arcpy.AddMessage(
-                f"Raster extent: "
-                f"{r_desc.extent.XMin}, "
-                f"{r_desc.extent.YMin}, "
-                f"{r_desc.extent.XMax}, "
-                f"{r_desc.extent.YMax}"
-            )
-
-            arcpy.AddMessage(
-                f"Buffer extent: "
-                f"{b_desc.extent.XMin}, "
-                f"{b_desc.extent.YMin}, "
-                f"{b_desc.extent.XMax}, "
-                f"{b_desc.extent.YMax}"
-            )
-
-            arcpy.AddMessage(
-                f"Raster SR: {r_desc.spatialReference.name}"
-            )
-
-            arcpy.AddMessage(
-                f"Buffer SR: {b_desc.spatialReference.name}"
-            )
-
-            clipped = ExtractByMask(
-                input_raster,
-                dtm_buffer_name
-            )
-
-            clipped.save(output_raster)
-
-            os.remove(input_raster)    
-
+                arcpy.AddMessage(
+                    f"Removed download folder: {dtm_download_folder}"
+                )
 
 
         return
